@@ -2,50 +2,43 @@
 #include <LiquidCrystal_I2C.h>
 #include <DHT.h>
 
-
 #define sensorPin 2
 #define limitSwitchPin 11
 #define buttonPin1 8
 #define buttonPin2 9
 #define relayPin 5
 #define ledPin 12
+#define heaterMinTimeOn 300000  // minimum time heater will run when cycled on
+#define heaterMinTimeOff 300000 // minimum time heater will remain off when cycled off
 
 DHT dht(sensorPin, DHT11);
 LiquidCrystal_I2C lcd(0x27, 16, 2);
 
-//float temperatureC = 0;
 float temperatureF = 0;
 unsigned long lastReading = 0;
-int sensorInterval = 2000;
-float setPoint = 55;
-float hysteresis = 5; // degrees of hysteresis around setpoint
-bool heaterStatus = false; // false = off, true = on
-bool limitSwitchStatus = LOW; // LOW = door open, HIGH = door closed
-bool lastLimitSwitchStatus = HIGH;
-bool buttonState1 = HIGH; // HIGH = NOT PRESSED
-bool lastButtonState1 = HIGH;
-bool buttonState2 = HIGH;
-bool lastButtonState2 = HIGH;
+int sensorInterval = 2000;  // how often sensor will read
+float setPoint = 55;        // temperature setpoint in deg F
+float hysteresis = 5;       // degrees of hysteresis around setpoint
+bool heaterStatus = false;  // false = off, true = on
+bool limitSwitchStatus = LOW;       // LOW = door open, HIGH = door closed
+bool lastLimitSwitchStatus = HIGH;  // LOW = door open, HIGH = door closed
+bool buttonState1 = HIGH;     // HIGH = NOT PRESSED
+bool lastButtonState1 = HIGH; // HIGH = NOT PRESSED
+bool buttonState2 = HIGH;     // HIGH = NOT PRESSED
+bool lastButtonState2 = HIGH; // HIGH = NOT PRESSED
 unsigned long lastDebounceTime = 0;  // the last time the output pin was toggled
 unsigned long debounceDelay = 50;    // the debounce time; increase if the output flickers
 unsigned long lastMillis = 0;
-unsigned long pageTimeout = 5000;
-int screenPage = 0; // 0 is main screen, 1 is menu, 2 is door open splash, 3 is hysteresis edit page
+unsigned long pageTimeout = 5000;    // sends display back to main screen after timeout
+int screenPage = 0;                  // 0 is main screen, 1 is menu, 2 is door open splash, 3 is hysteresis edit page
 int lastScreenPage = 0;
-// Set the menu options
-String menuOptions[] = {"Back", "Htr Enbl/Disbl", "Edit Hyst", "Fan Enbl/Disbl", "LS Enbl/Disbl", " "};
-// Set the number of menu options
-//int numMenuOptions = sizeof(menuOptions) / sizeof(menuOptions[0]);
-// Set the starting index for the menu
-int menuIndex = 0;
-bool limitSwitchEnabled = true;
-bool heaterEnabled = true;
-bool fanEnabled = true;
-int heaterMinTimeOn = 300000;  // minimum time heater will run when cycled on
-int heaterMinTimeOff = 300000; // minimum time heater will remain off when cycled off
-int heaterTimeOn = 0;  // used to track time heater has been on
-int heaterTimeOff = 0; // used to track time heater has been off
-
+String menuOptions[] = {"Back", "Htr Enbl/Disbl", "Edit Hyst", "Fan Enbl/Disbl", "LS Enbl/Disbl", " "};  // Set the menu options
+int menuIndex = 0; // Set the starting index for the menu
+bool limitSwitchEnabled = true;   // enable/disable garage door switch
+bool heaterEnabled = true;        // enablle/disable heater - different than switching on and off, this will prevent the heater from turning on at all
+bool fanEnabled = true;           // enable/disable fan function (to be added later)
+float heaterTimeOn = 0;             // used to track time heater has been on
+float heaterTimeOff = -60000 * 5;   // used to track time heater has been off, starting with a negative value allows heater to turn on right away when controller is turned on
 
 void setup() {
   Serial.begin(9600);
@@ -132,7 +125,7 @@ void loop() {
       {
         setPoint = setPoint + 1;
         lcd.setCursor(4,1);
-        lcd.print(setPoint);
+        lcd.print(setPoint,1);
         lcd.print(" F ");
         delay(500);
       }
@@ -144,7 +137,7 @@ void loop() {
       {
         setPoint = setPoint - 1;
         lcd.setCursor(4,1);
-        lcd.print(setPoint);
+        lcd.print(setPoint,1);
         lcd.print(" F ");
         delay(500);
       }
@@ -196,7 +189,6 @@ void loop() {
 
 void readSensor() {
   // Get a reading from the temperature sensor:
-  //temperatureC = dht.readTemperature();
   temperatureF = dht.readTemperature(true);
   lastReading = millis();
 }
