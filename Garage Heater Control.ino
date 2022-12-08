@@ -1,19 +1,19 @@
 #include <Wire.h>
 #include <LiquidCrystal_I2C.h>
-#include <SPI.h>
-#include <SD.h>
 #include <DHT.h>
 
+
 #define sensorPin 2
-#define limitSwitchPin 2
-#define buttonPin1 10
-#define buttonPin2 11
+#define limitSwitchPin 11
+#define buttonPin1 8
+#define buttonPin2 9
 #define relayPin 5
+#define ledPin 12
 
 DHT dht(sensorPin, DHT11);
 LiquidCrystal_I2C lcd(0x27, 16, 2);
 
-float temperatureC = 0;
+//float temperatureC = 0;
 float temperatureF = 0;
 unsigned long lastReading = 0;
 int sensorInterval = 2000;
@@ -35,12 +35,17 @@ int lastScreenPage = 0;
 // Set the menu options
 String menuOptions[] = {"Back", "Htr Enbl/Disbl", "Edit Hyst", "Fan Enbl/Disbl", "LS Enbl/Disbl", " "};
 // Set the number of menu options
-int numMenuOptions = sizeof(menuOptions) / sizeof(menuOptions[0]);
+//int numMenuOptions = sizeof(menuOptions) / sizeof(menuOptions[0]);
 // Set the starting index for the menu
 int menuIndex = 0;
 bool limitSwitchEnabled = true;
 bool heaterEnabled = true;
 bool fanEnabled = true;
+int heaterMinTimeOn = 300000;  // minimum time heater will run when cycled on
+int heaterMinTimeOff = 300000; // minimum time heater will remain off when cycled off
+int heaterTimeOn = 0;  // used to track time heater has been on
+int heaterTimeOff = 0; // used to track time heater has been off
+
 
 void setup() {
   Serial.begin(9600);
@@ -83,19 +88,25 @@ void loop() {
     if (screenPage == 0)
     {
       lcd.setCursor(4,0);
-      lcd.print(temperatureF);
+      lcd.print(temperatureF,1);
       lcd.print(" F ");
       lcd.setCursor(4,1);
-      lcd.print(setPoint);
+      lcd.print(setPoint,1);
       lcd.print(" F ");
     }
 
-    // ON OFF CONTROL
-    if (temperatureF < (setPoint - hysteresis/2) && heaterStatus == false && heaterEnabled == true) 
+    // ON CONTROL
+    if (temperatureF < (setPoint - hysteresis/2)     // temperature below setpoint minus half of hysteresis
+    && heaterStatus == false                         // heater is off
+    && heaterEnabled == true                         // heater is enabled
+    && millis() - heaterTimeOff > heaterMinTimeOff)  // heater has been off for at least the minimum off time
     {
       enableHeat();
     }
-    else if (temperatureF > (setPoint + hysteresis/2) && heaterStatus == true) 
+    // OFF CONTROL
+    else if (temperatureF > (setPoint + hysteresis/2) // temperature is above setpoint plus half of hysteresis
+    && heaterStatus == true                           // heater is on
+    && millis() - heaterTimeOn > heaterMinTimeOn)     // heater has been on for at least the minimum on time 
     {
       disableHeat();
     }
@@ -160,7 +171,7 @@ void loop() {
         {
           hysteresis = hysteresis + 0.5;
           lcd.setCursor(0, 1);
-          lcd.print(hysteresis);
+          lcd.print(hysteresis,1);
           lcd.print (" degrees");
           delay(500);
           lastMillis = millis();
@@ -173,7 +184,7 @@ void loop() {
         {
           hysteresis = hysteresis - 0.5;
           lcd.setCursor(0, 1);
-          lcd.print(hysteresis);
+          lcd.print(hysteresis,1);
           lcd.print (" degrees");
           delay(500);
           lastMillis = millis();
@@ -185,7 +196,7 @@ void loop() {
 
 void readSensor() {
   // Get a reading from the temperature sensor:
-  temperatureC = dht.readTemperature();
+  //temperatureC = dht.readTemperature();
   temperatureF = dht.readTemperature(true);
   lastReading = millis();
 }
@@ -194,7 +205,9 @@ void enableHeat() {
   if (heaterEnabled == true)
   {
     heaterStatus = true;
+    heaterTimeOn = millis(); // set TimeOn to current time
     digitalWrite(relayPin, HIGH);
+    digitalWrite(ledPin, HIGH);
     if (screenPage == 0) // only print when on main screen
     {
       lcd.setCursor(13,0);
@@ -205,7 +218,9 @@ void enableHeat() {
 
 void disableHeat() {
   heaterStatus = false;
+  heaterTimeOff = millis(); // set TimeOff to current time
   digitalWrite(relayPin, LOW);
+  digitalWrite(ledPin, LOW);
   if (screenPage == 0 && heaterEnabled == true) // only print when on main screen
   {
     lcd.setCursor(13,0);
@@ -333,8 +348,8 @@ void menu() {
         lcd.setCursor(0, 0);
         lcd.print("Hysteresis value:");
         lcd.setCursor(0, 1);
-        lcd.print(hysteresis);
-        lcd.print (" degrees");
+        lcd.print(hysteresis,1);
+        lcd.print(" degrees");
         delay(500);
         lastMillis = millis();
       }
