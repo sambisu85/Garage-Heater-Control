@@ -1,17 +1,22 @@
-#include <LiquidCrystal.h>
+#include <Wire.h>
+#include <LiquidCrystal_I2C.h>
+#include <SPI.h>
+#include <SD.h>
+#include <DHT.h>
 
-LiquidCrystal lcd(12, 11, 10, 9, 8, 7);
-
-#define sensorPin A0
+#define sensorPin 2
 #define limitSwitchPin 2
-#define buttonPin1 4
-#define buttonPin2 3
+#define buttonPin1 10
+#define buttonPin2 11
 #define relayPin 5
+
+DHT dht(sensorPin, DHT11);
+LiquidCrystal_I2C lcd(0x27, 16, 2);
 
 float temperatureC = 0;
 float temperatureF = 0;
 unsigned long lastReading = 0;
-int sensorInterval = 1000;
+int sensorInterval = 2000;
 float setPoint = 55;
 float hysteresis = 5; // degrees of hysteresis around setpoint
 bool heaterStatus = false; // false = off, true = on
@@ -39,7 +44,9 @@ bool fanEnabled = true;
 
 void setup() {
   Serial.begin(9600);
-  lcd.begin(16, 2);
+  lcd.init();
+  lcd.clear();
+  lcd.backlight();
   lcd.setCursor(0,0);
   lcd.print("      Briv");
   lcd.setCursor(0,1);
@@ -48,6 +55,7 @@ void setup() {
   lcd.clear();
   configureDisplay();
   lcd.print("Off");
+  dht.begin();
 
   pinMode(sensorPin, INPUT);
   pinMode(limitSwitchPin, INPUT_PULLUP);
@@ -177,15 +185,8 @@ void loop() {
 
 void readSensor() {
   // Get a reading from the temperature sensor:
-  int reading = analogRead(sensorPin);
-
-  // Convert the reading into voltage:
-  float voltage = reading * (5000 / 1024.0);
-
-  // Convert the voltage into the temperature in Celsius:
-  temperatureC = (voltage - 500) / 10;
-  temperatureF = temperatureC * (9/5) +32;
-  temperatureF = map(temperatureF,-18,481,-0,100);
+  temperatureC = dht.readTemperature();
+  temperatureF = dht.readTemperature(true);
   lastReading = millis();
 }
 
